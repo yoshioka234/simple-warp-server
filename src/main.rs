@@ -24,12 +24,14 @@ async fn main() {
     let wait_shutdown = shutdown_signal.clone();
 
     tokio::spawn(async move {
+        let notify_shutdown_complete = wait_shutdown.clone();
         warp::serve(routes)
             .bind_with_graceful_shutdown(srv_addr, async move {
                 wait_shutdown.notified().await;
             })
             .1
             .await;
+        notify_shutdown_complete.notify_one();
     });
 
     if let Err(e) = shutdown().await {
@@ -37,6 +39,8 @@ async fn main() {
     }
     info!("shutting down the server");
     shutdown_signal.notify_one();
+    shutdown_signal.notified().await;
+    info!("shutdown complete");
 }
 
 async fn shutdown() -> Result<()> {
